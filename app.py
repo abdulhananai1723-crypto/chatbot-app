@@ -1,18 +1,18 @@
 import streamlit as st
 from google import genai
 
-# -------------------------------
+# ---------------------------------
 # PAGE SETTINGS
-# -------------------------------
+# ---------------------------------
 st.set_page_config(
     page_title="Lucky AI Chat",
     page_icon="🤖",
     layout="centered"
 )
 
-# -------------------------------
+# ---------------------------------
 # CUSTOM CSS
-# -------------------------------
+# ---------------------------------
 st.markdown("""
 <style>
 
@@ -32,7 +32,7 @@ st.markdown("""
 .sub-title {
     text-align: center;
     color: gray;
-    margin-bottom: 35px;
+    margin-bottom: 30px;
 }
 
 .stChatMessage {
@@ -48,27 +48,38 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------------------
-# GEMINI API KEY
-# -------------------------------
+# ---------------------------------
+# GEMINI API SETUP
+# ---------------------------------
 try:
+    gemini_key = st.secrets["GEMINI_API_KEY"]
+
     client = genai.Client(
-        api_key=st.secrets["GEMINI_API_KEY"]
+        api_key=gemini_key
     )
-except Exception:
-    st.error("⚠️ Gemini API key missing hai.")
-    st.info("Streamlit Secrets mein GEMINI_API_KEY add karo.")
+
+except KeyError:
+    st.error("⚠️ GEMINI_API_KEY missing hai.")
+    st.info(
+        'Streamlit → Manage app → Settings → Secrets mein ye add karo:\n\n'
+        'GEMINI_API_KEY = "apni_gemini_api_key"'
+    )
     st.stop()
 
-# -------------------------------
+except Exception as e:
+    st.error("⚠️ Gemini setup error.")
+    st.code(str(e))
+    st.stop()
+
+# ---------------------------------
 # SIDEBAR
-# -------------------------------
+# ---------------------------------
 with st.sidebar:
 
     st.title("🤖 Lucky AI")
 
     st.write(
-        "Your personal AI assistant powered by artificial intelligence."
+        "Your personal AI assistant powered by Gemini."
     )
 
     st.divider()
@@ -77,6 +88,7 @@ with st.sidebar:
         "🗑 Clear Chat",
         use_container_width=True
     ):
+
         st.session_state.messages = [
             {
                 "role": "assistant",
@@ -92,9 +104,9 @@ with st.sidebar:
     st.caption("Developed by Abdul Hanan")
     st.caption("Lucky Brand AI")
 
-# -------------------------------
+# ---------------------------------
 # MAIN HEADING
-# -------------------------------
+# ---------------------------------
 st.markdown(
     '<div class="main-title">🤖 Lucky AI Chat</div>',
     unsafe_allow_html=True
@@ -105,9 +117,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# -------------------------------
-# CHAT HISTORY
-# -------------------------------
+# ---------------------------------
+# SESSION STATE
+# ---------------------------------
 if "messages" not in st.session_state:
 
     st.session_state.messages = [
@@ -118,22 +130,24 @@ if "messages" not in st.session_state:
         }
     ]
 
-# Display previous messages
+# ---------------------------------
+# DISPLAY OLD MESSAGES
+# ---------------------------------
 for message in st.session_state.messages:
 
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# -------------------------------
+# ---------------------------------
 # USER INPUT
-# -------------------------------
+# ---------------------------------
 user_prompt = st.chat_input(
     "Ask Lucky AI anything..."
 )
 
 if user_prompt:
 
-    # User message save
+    # Save user message
     st.session_state.messages.append(
         {
             "role": "user",
@@ -141,23 +155,26 @@ if user_prompt:
         }
     )
 
+    # Display user message
     with st.chat_message("user"):
         st.markdown(user_prompt)
 
-    # -------------------------------
-    # BUILD CONVERSATION
-    # -------------------------------
+    # ---------------------------------
+    # PREPARE FULL CONVERSATION
+    # ---------------------------------
     conversation = """
-You are Lucky AI, a helpful personal AI assistant created by Abdul Hanan.
+You are Lucky AI, a helpful AI assistant created by Abdul Hanan.
 
-Rules:
+Instructions:
 - Be friendly and helpful.
+- Reply in the same language as the user.
 - If user writes Roman Urdu, reply in Roman Urdu.
 - If user writes Urdu, reply in Urdu.
 - If user writes English, reply in English.
-- Explain difficult concepts simply.
+- Explain difficult things simply.
+- Keep answers natural and clear.
 - Do not repeatedly introduce yourself.
-- Keep answers clear and natural.
+- You are called Lucky AI.
 
 Conversation:
 """
@@ -167,14 +184,14 @@ Conversation:
         if msg["role"] == "user":
             conversation += f"\nUser: {msg['content']}"
 
-        else:
+        elif msg["role"] == "assistant":
             conversation += f"\nLucky AI: {msg['content']}"
 
     conversation += "\nLucky AI:"
 
-    # -------------------------------
+    # ---------------------------------
     # GEMINI RESPONSE
-    # -------------------------------
+    # ---------------------------------
     with st.chat_message("assistant"):
 
         with st.spinner("Lucky AI is thinking..."):
@@ -188,21 +205,40 @@ Conversation:
 
                 ai_reply = response.text
 
-                st.markdown(ai_reply)
+                if ai_reply:
 
-                st.session_state.messages.append(
-                    {
-                        "role": "assistant",
-                        "content": ai_reply
-                    }
-                )
+                    st.markdown(ai_reply)
+
+                    st.session_state.messages.append(
+                        {
+                            "role": "assistant",
+                            "content": ai_reply
+                        }
+                    )
+
+                else:
+                    st.error(
+                        "⚠️ Lucky AI ne empty response return kiya."
+                    )
 
             except Exception as e:
 
+                error_text = str(e)
+
                 st.error(
-                    "⚠️ Lucky AI temporarily response nahi de pa raha."
+                    "❌ Lucky AI response generate nahi kar saka."
                 )
 
-                st.caption(
-                    "API key, Gemini free quota ya internet connection check karein."
-                )
+                if "429" in error_text:
+                    st.warning(
+                        "Gemini free quota temporarily complete ho sakta hai. "
+                        "Thori dair baad dobara try karo."
+                    )
+
+                elif "API_KEY" in error_text.upper():
+                    st.warning(
+                        "Gemini API key ko dobara check karo."
+                    )
+
+                else:
+                    st.code(error_text)
