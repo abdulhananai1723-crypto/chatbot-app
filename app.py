@@ -1,18 +1,18 @@
 import streamlit as st
-from openai import OpenAI
+from google import genai
 
-# ---------------------------------
+# -------------------------------
 # PAGE SETTINGS
-# ---------------------------------
+# -------------------------------
 st.set_page_config(
     page_title="Lucky AI Chat",
     page_icon="🤖",
     layout="centered"
 )
 
-# ---------------------------------
+# -------------------------------
 # CUSTOM CSS
-# ---------------------------------
+# -------------------------------
 st.markdown("""
 <style>
 
@@ -48,20 +48,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------------
-# API KEY
-# ---------------------------------
+# -------------------------------
+# GEMINI API KEY
+# -------------------------------
 try:
-    client = OpenAI(
-        api_key=st.secrets["OPENAI_API_KEY"]
+    client = genai.Client(
+        api_key=st.secrets["GEMINI_API_KEY"]
     )
 except Exception:
-    st.error("⚠️ API key is missing. Add OPENAI_API_KEY in Streamlit Secrets.")
+    st.error("⚠️ Gemini API key missing hai.")
+    st.info("Streamlit Secrets mein GEMINI_API_KEY add karo.")
     st.stop()
 
-# ---------------------------------
+# -------------------------------
 # SIDEBAR
-# ---------------------------------
+# -------------------------------
 with st.sidebar:
 
     st.title("🤖 Lucky AI")
@@ -76,8 +77,13 @@ with st.sidebar:
         "🗑 Clear Chat",
         use_container_width=True
     ):
-
-        st.session_state.messages = []
+        st.session_state.messages = [
+            {
+                "role": "assistant",
+                "content":
+                "Assalam-o-Alaikum 👋 I am Lucky AI. How can I help you today?"
+            }
+        ]
 
         st.rerun()
 
@@ -86,9 +92,9 @@ with st.sidebar:
     st.caption("Developed by Abdul Hanan")
     st.caption("Lucky Brand AI")
 
-# ---------------------------------
-# HEADING
-# ---------------------------------
+# -------------------------------
+# MAIN HEADING
+# -------------------------------
 st.markdown(
     '<div class="main-title">🤖 Lucky AI Chat</div>',
     unsafe_allow_html=True
@@ -99,9 +105,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ---------------------------------
-# SESSION STATE
-# ---------------------------------
+# -------------------------------
+# CHAT HISTORY
+# -------------------------------
 if "messages" not in st.session_state:
 
     st.session_state.messages = [
@@ -112,25 +118,22 @@ if "messages" not in st.session_state:
         }
     ]
 
-# ---------------------------------
-# DISPLAY OLD MESSAGES
-# ---------------------------------
+# Display previous messages
 for message in st.session_state.messages:
 
     with st.chat_message(message["role"]):
-
         st.markdown(message["content"])
 
-# ---------------------------------
+# -------------------------------
 # USER INPUT
-# ---------------------------------
+# -------------------------------
 user_prompt = st.chat_input(
     "Ask Lucky AI anything..."
 )
 
 if user_prompt:
 
-    # Save user message
+    # User message save
     st.session_state.messages.append(
         {
             "role": "user",
@@ -138,54 +141,55 @@ if user_prompt:
         }
     )
 
-    # Display user message
     with st.chat_message("user"):
-
         st.markdown(user_prompt)
 
-    # ---------------------------------
-    # AI RESPONSE
-    # ---------------------------------
+    # -------------------------------
+    # BUILD CONVERSATION
+    # -------------------------------
+    conversation = """
+You are Lucky AI, a helpful personal AI assistant created by Abdul Hanan.
+
+Rules:
+- Be friendly and helpful.
+- If user writes Roman Urdu, reply in Roman Urdu.
+- If user writes Urdu, reply in Urdu.
+- If user writes English, reply in English.
+- Explain difficult concepts simply.
+- Do not repeatedly introduce yourself.
+- Keep answers clear and natural.
+
+Conversation:
+"""
+
+    for msg in st.session_state.messages:
+
+        if msg["role"] == "user":
+            conversation += f"\nUser: {msg['content']}"
+
+        else:
+            conversation += f"\nLucky AI: {msg['content']}"
+
+    conversation += "\nLucky AI:"
+
+    # -------------------------------
+    # GEMINI RESPONSE
+    # -------------------------------
     with st.chat_message("assistant"):
 
         with st.spinner("Lucky AI is thinking..."):
 
             try:
 
-                conversation = []
-
-                for msg in st.session_state.messages:
-
-                    conversation.append(
-                        {
-                            "role": msg["role"],
-                            "content": msg["content"]
-                        }
-                    )
-
-                response = client.responses.create(
-
-                    model="gpt-5",
-
-                    instructions="""
-You are Lucky AI, a helpful personal AI assistant.
-
-Be friendly, intelligent and concise.
-
-If the user speaks Urdu, Roman Urdu or English,
-reply naturally in the same language.
-
-Explain difficult concepts in simple language.
-""",
-
-                    input=conversation
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=conversation
                 )
 
-                ai_reply = response.output_text
+                ai_reply = response.text
 
                 st.markdown(ai_reply)
 
-                # Save assistant response
                 st.session_state.messages.append(
                     {
                         "role": "assistant",
@@ -195,6 +199,10 @@ Explain difficult concepts in simple language.
 
             except Exception as e:
 
-                st.error("❌ AI response failed.")
+                st.error(
+                    "⚠️ Lucky AI temporarily response nahi de pa raha."
+                )
 
-                st.code(str(e))
+                st.caption(
+                    "API key, Gemini free quota ya internet connection check karein."
+                )
